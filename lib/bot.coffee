@@ -1,3 +1,5 @@
+require('dotenv').config()
+
 Botkit = require('botkit')
 getUrls = require('get-urls')
 AWS = require('aws-sdk')
@@ -21,6 +23,7 @@ LookQueryRunner = require('./repliers/look_query_runner')
 versionChecker = require('./version_checker')
 ScheduleReceiver = require('./schedule_receiver')
 DataActionReceiver = require('./data_action_receiver')
+HealthCheckReceiver = require('./health_check_receiver')
 
 if process.env.DEV == "true"
   # Allow communicating with Lookers running on localhost with self-signed certificates
@@ -51,7 +54,7 @@ randomPNGPath = ->
 lookers = lookerConfig.map((looker) ->
 
   # Amazon S3
-  if process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
+  if process.env.SLACKBOT_S3_BUCKET
     looker.storeBlob = (blob, success, error) ->
       key = randomPNGPath()
       region = process.env.SLACKBOT_S3_BUCKET_REGION
@@ -77,7 +80,7 @@ lookers = lookerConfig.map((looker) ->
           success("https://#{domain}/#{params.Bucket}/#{key}")
 
   # Azure
-  else if process.env.AZURE_STORAGE_ACCOUNT && process.env.AZURE_STORAGE_ACCESS_KEY
+  else if process.env.SLACKBOT_AZURE_CONTAINER
     looker.storeBlob = (blob, success, error) ->
       key = randomPNGPath()
       container = process.env.SLACKBOT_AZURE_CONTAINER
@@ -206,6 +209,7 @@ controller.setupWebserver process.env.PORT || 3333, (err, expressWebserver) ->
   controller.createWebhookEndpoints(expressWebserver)
   ScheduleReceiver.listen(expressWebserver, defaultBot, lookers)
   DataActionReceiver.listen(expressWebserver, defaultBot, lookers)
+  HealthCheckReceiver.listen(expressWebserver, defaultBot, lookers)
 
 controller.on 'rtm_reconnect_failed', ->
   throw new Error("Failed to reconnect to the Slack RTM API.")
@@ -310,7 +314,7 @@ processCommand = (bot, message, isDM = false) ->
 
       if newVersion
         helpAttachments.push(
-          text: "\n\n:scream: *<#{newVersion.html_url}|The Looker Slack integration is out of date! Version #{newVersion.tag_name} is now available.>* :scream:"
+          text: "\n\n:scream: *<#{newVersion.html_url}|Lookerbot is out of date! Version #{newVersion.tag_name} is now available.>* :scream:"
           color: "warning"
           mrkdwn_in: ["text"]
         )
